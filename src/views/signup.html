@@ -3,28 +3,91 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Signup</title>
-    <link rel="stylesheet" href="" />
+    <title>Sign Up</title>
+    <!-- <link rel="stylesheet" href="signup.css" /> -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   </head>
+
   <body>
-    <h1>Signup</h1>
+    <div class="signup-div">
+      <h1>Sign Up</h1>
+      <form id="signupForm" class="signup-form">
+        <label for="name">Name</label>
+        <input
+          type="text"
+          id="name"
+          name="username"
+          placeholder="Enter Name"
+          required
+        />
 
-    <form action="/auth/signup" method="POST">
-      <label>Name</label>
-      <input type="text" name="name" required />
+        <label for="email">Email</label>
+        <input
+          id="email"
+          type="email"
+          name="email"
+          placeholder="Enter Email"
+          required
+        />
 
-      <label>Email</label>
-      <input type="email" name="email" required />
+        <label for="phoneNumber">Phone Number</label>
+        <input
+          id="phoneNumber"
+          type="tel"
+          name="phoneNumber"
+          placeholder="Enter Phone Number"
+          required
+          maxlength="10"
+        />
 
-      <label>Phone</label>
-      <input type="text" name="phone" required />
+        <label for="password">Password</label>
+        <input
+          id="password"
+          type="password"
+          name="password"
+          placeholder="Enter Password"
+          required
+        />
 
-      <label>Password</label>
-      <input type="password" name="password" required />
+        <button type="submit">Sign Up</button>
+      </form>
 
-      <button type="submit">Create Account</button>
-    </form>
+      <p class="bottom-link">
+        You already have account?<a href="/login.html">login</a>
+      </p>
+      <div>
+        <p id="error-tag"></p>
+      </div>
+    </div>
 
-    <p>Already have an account? <a href="/login">Login</a></p>
+    <script>
+      const form = document.getElementById("signupForm");
+      const errorMsg = document.getElementById("errorMsg");
+
+      form.addEventListener("submit", async (e) => {
+        event.preventDefault();
+
+        const username = document.getElementById("name").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const phoneNumber = document.getElementById("phoneNumber").value.trim();
+        const password = document.getElementById("password").value.trim();
+
+        try {
+          await axios.post("http://localhost:4000/user/signup", {
+            username,
+            email,
+            phoneNumber,
+            password,
+          });
+
+          alert("Account created successfully! Please login.");
+          window.location.href = "login.html";
+        } catch (error) {
+          errorMsg.textContent =
+            error.response?.data?.message || "Signup failed. Please try again.";
+          errorMsg.style.display = "block";
+        }
+      });
+    </script>
   </body>
 </html>
