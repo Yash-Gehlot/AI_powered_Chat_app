@@ -1,0 +1,24 @@
+import express from "express";
+import dotenv from "dotenv";
+import sequelize from "./src/config/db-connection.js";
+
+import userRoutes from "./src/routes/userRoutes.js";
+
+dotenv.config();
+
+const app = express();
+
+const PORT = process.env.PORT;
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+app.use("/user", userRoutes);
+
+sequelize.sync().then(() => {
+  console.log("Database synced");
+});
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
