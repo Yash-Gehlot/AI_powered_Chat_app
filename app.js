@@ -4,6 +4,7 @@ import path from "path";
 
 import sequelize from "./src/config/db-connection.js";
 import userRoutes from "./src/routes/userRoutes.js";
+import chatRoutes from "./src/routes/chatRoutes.js";
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.get("/chat", (req, res) => {
 });
 
 app.use("/user", userRoutes);
+app.use("/chat", chatRoutes);
 
 sequelize.sync().then(() => {
   console.log("Database synced");
