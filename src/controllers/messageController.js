@@ -2,20 +2,42 @@ import Message from "../models/message.js";
 
 export const sendMessage = async (req, res) => {
   try {
-    const { userId, message } = req.body;
+    const userId = req.payload.id;
+    const { message } = req.body;
 
-    if (!userId || !message) {
-      return res.status(400).json({ msg: "userId and message required" });
+    if (!message) {
+      return res.status(401).json({
+        message: "Please enter message",
+      });
     }
 
-    const newMsg = await Message.create({ userId, message });
+    const createdMessage = await Message.create({ userId, message });
 
     return res.json({
-      success: true,
-      data: newMsg,
+      message: "Sent",
+      createdMessage,
     });
   } catch (err) {
     console.log(err);
     res.status(500).json({ msg: "Failed to send message" });
+  }
+};
+
+export const getMessage = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const messages = await Message.findAll({
+      where: { userId },
+    });
+
+    return res.status(200).json({
+      message: "Success",
+      messages,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.message,
+    });
   }
 };

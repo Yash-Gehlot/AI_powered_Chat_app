@@ -4,7 +4,7 @@ import path from "path";
 
 import sequelize from "./src/config/db-connection.js";
 import userRoutes from "./src/routes/userRoutes.js";
-import chatRoutes from "./src/routes/chatRoutes.js";
+import chatRoutes from "./src/routes/messageRoutes.js";
 
 dotenv.config();
 
