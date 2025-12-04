@@ -1,7 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
-import sequelize from "./src/config/db-connection.js";
+import path from "path";
 
+import sequelize from "./src/config/db-connection.js";
 import userRoutes from "./src/routes/userRoutes.js";
 
 dotenv.config();
@@ -12,6 +13,10 @@ const PORT = process.env.PORT;
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+
+app.get("/chat", (req, res) => {
+  res.sendFile(path.join(process.cwd(), "src/views/chat.html"));
+});
 
 app.use("/user", userRoutes);
 
