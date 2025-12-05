@@ -2,7 +2,7 @@ import Message from "../models/message.js";
 
 export const sendMessage = async (req, res) => {
   try {
-    const userId = req.payload.id;
+    const userId = req.user.id;
     const { message } = req.body;
 
     if (!message) {
