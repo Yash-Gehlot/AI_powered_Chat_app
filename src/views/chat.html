@@ -28,20 +28,15 @@
       const messageInput = document.getElementById("messageInput");
       const chatMessages = document.getElementById("chatMessages");
 
-      // Create WebSocket connection
-      const socket = new WebSocket("ws://localhost:4000");
+      if (!token) {
+        window.location.href = "../client/signUp/signup.html";
+      }
+      const socket = io("http://localhost:4000");
 
-      socket.onopen = () => {
-        console.log("WebSocket connected");
-      };
+      socket.on("receive-message", (message) => {
+        addMessage(message, "Received");
+      });
 
-      // Receive messages from server
-      socket.onmessage = async (event) => {
-        const data = event.data;
-        addMessage(data, "received");
-      };
-
-      // Send message to API + WebSocket
       document
         .getElementById("chatForm")
         .addEventListener("submit", async (event) => {
@@ -60,10 +55,7 @@
                 },
               }
             );
-
-            // Send through WebSocket (real-time)
-            socket.send(message);
-
+            socket.emit("send-message", message);
             addMessage(message, "sent");
           } catch (error) {
             console.log(error.response);

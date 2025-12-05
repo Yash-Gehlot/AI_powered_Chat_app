@@ -2,8 +2,8 @@ import express from "express";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import http from "http"; // NEW
-import { WebSocketServer } from "ws"; // NEW
+import http from "http";
+import { Server } from "socket.io";
 
 import sequelize from "./src/config/db-connection.js";
 import userRoutes from "./src/routes/userRoutes.js";
@@ -18,15 +18,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// BODY PARSERS
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// STATIC FILES
 app.use(express.static(path.join(__dirname, "src", "public")));
 app.use(express.static(path.join(__dirname, "src", "views")));
 
-// ROUTES
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "src", "views", "signup.html"));
 });
@@ -39,21 +36,20 @@ sequelize.sync().then(() => {
 });
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const io = new Server(server, {
+  cors: {
+    origin: "http://127.0.0.1:5500",
+    methods: ["GET", "POST"],
+  },
+});
+io.on("connection", (socket) => {
+  console.log(`${socket.id} : User Connected 💖`);
 
-let sockets = [];
-wss.on("connection", (ws) => {
-  console.log("WebSocket client connected");
-  sockets.push(ws);
-
-  ws.on("message", (message) => {
-    sockets.forEach((s) => {
-      s.send(message);
-    });
+  socket.on("send-message", (message) => {
+    console.log(`User : ${socket.id} -- Message : ${message}`);
+    io.emit("receive-message", message);
   });
 });
-
-export { wss };
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
