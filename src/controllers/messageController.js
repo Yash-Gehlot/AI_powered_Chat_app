@@ -1,4 +1,5 @@
 import Message from "../models/message.js";
+import User from "../models/user.js";
 
 export const sendMessage = async (req, res) => {
   try {
@@ -25,10 +26,14 @@ export const sendMessage = async (req, res) => {
 
 export const getMessage = async (req, res) => {
   try {
-    const userId = req.user.id;
-
     const messages = await Message.findAll({
-      where: { userId },
+      include: [
+        {
+          model: User,
+          attributes: ["id", "username"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
     });
 
     return res.status(200).json({
@@ -36,6 +41,7 @@ export const getMessage = async (req, res) => {
       messages,
     });
   } catch (err) {
+    console.log(err);
     return res.status(500).json({
       error: err.message,
     });

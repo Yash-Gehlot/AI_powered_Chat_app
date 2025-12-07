@@ -3,11 +3,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chat Window</title>
-    <!-- <link rel="stylesheet" href="chat.css" /> -->
+    <link rel="stylesheet" href="chat.css" />
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="http://localhost:4000/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   </head>
-  <body style="background-color: black; color: wheat">
+  <body>
     <div class="chat-container">
       <div class="chat-header"><h2>Chat Room</h2></div>
       <div class="chat-messages" id="chatMessages"></div>
@@ -28,13 +28,25 @@
       const messageInput = document.getElementById("messageInput");
       const chatMessages = document.getElementById("chatMessages");
 
-      if (!token) {
-        window.location.href = "../client/signUp/signup.html";
-      }
-      const socket = io("http://localhost:4000");
+      const displayedMessageIds = new Set();
 
-      socket.on("receive-message", (message) => {
-        addMessage(message, "Received");
+      const socket = io({
+        auth: {
+          token: localStorage.getItem("token")
+        }
+      });
+
+      socket.on("connect", () => {
+        console.log("Connected to server:", socket.id);
+      });
+
+      socket.on("disconnect", () => {
+        console.log("Disconnected from server");
+      });
+
+      socket.on("receive-message", async (data) => {
+        console.log("Received message via Socket.IO:", data);
+        await loadMessages();
       });
 
       document
@@ -55,17 +67,22 @@
                 },
               }
             );
-            socket.emit("send-message", message);
-            addMessage(message, "sent");
+
+            const username = localStorage.getItem("username") || "Anonymous";
+            socket.emit("send-message", { message, username });
+
+            await loadMessages();
+
+            console.log("Message sent successfully");
           } catch (error) {
-            console.log(error.response);
+            console.log("Error sending message:", error.response);
+            alert("Failed to send message. Please try again.");
           }
 
           event.target.reset();
         });
 
-      // Load past messages from DB
-      window.addEventListener("DOMContentLoaded", async () => {
+      async function loadMessages() {
         try {
           const response = await axios.get(`${messageLink}/receve`, {
             headers: {
@@ -74,19 +91,45 @@
           });
 
           const messages = response.data.messages || [];
+          const currentUserId = localStorage.getItem("userId");
+
+          chatMessages.innerHTML = "";
+          displayedMessageIds.clear();
 
           messages.forEach((msg) => {
-            addMessage(msg.message, "sent");
-          });
-        } catch (error) {
-          console.log(error.response);
-        }
-      });
+            if (displayedMessageIds.has(msg.id)) return;
+            displayedMessageIds.add(msg.id);
 
-      function addMessage(text, type) {
+            const isMine = msg.userId == currentUserId;
+            const username = msg.User?.name || "Unknown";
+
+            if (isMine) {
+              addMessage(msg.message, "sent", "You");
+            } else {
+              addMessage(msg.message, "received", username);
+            }
+          });
+
+          console.log(`Loaded ${messages.length} messages from database`);
+        } catch (error) {
+          console.log("Error loading messages:", error.response);
+        }
+      }
+
+      window.addEventListener("DOMContentLoaded", loadMessages);
+
+      function addMessage(text, type, username = null) {
         const div = document.createElement("div");
         div.classList.add("message", type);
-        div.innerHTML = `<p>${text}</p>`;
+
+        let content = "";
+        if (username) {
+          content = `<div class="message-username">${username}</div>`;
+        }
+        content += `<div>${text}</div>`;
+
+        div.innerHTML = content;
+
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }

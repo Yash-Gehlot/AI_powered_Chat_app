@@ -3,20 +3,23 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
-import { Server } from "socket.io";
 
+import socketIo from "./src/socket_io/index.js";
+import "./src/models/index.js";
 import sequelize from "./src/config/db-connection.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import chatRoutes from "./src/routes/messageRoutes.js";
 
 dotenv.config({ quiet: true });
-
 const PORT = process.env.PORT || 4000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+const server = http.createServer(app);
+socketIo(server);
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -33,22 +36,6 @@ app.use("/chat", chatRoutes);
 
 sequelize.sync().then(() => {
   console.log("Database synced");
-});
-
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "http://127.0.0.1:5500",
-    methods: ["GET", "POST"],
-  },
-});
-io.on("connection", (socket) => {
-  console.log(`${socket.id} : User Connected 💖`);
-
-  socket.on("send-message", (message) => {
-    console.log(`User : ${socket.id} -- Message : ${message}`);
-    socket.broadcast.emit("receive-message", message);
-  });
 });
 
 server.listen(PORT, () => {
