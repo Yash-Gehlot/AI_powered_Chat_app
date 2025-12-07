@@ -8,11 +8,12 @@ const socketServer = (server) => {
 
   // auth middleware
   socketAuth(io);
-  personalChat(io);
+
   // Socket.io handshake
   io.on("connection", (socket) => {
     console.log(`${socket.id} : User Connected 💖`);
-    chatHandler(socket, io);
+    // Personal chats groups
+    personalChat(io);
   });
 
   return io;
