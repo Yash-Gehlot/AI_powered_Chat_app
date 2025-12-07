@@ -69,7 +69,8 @@
             // ✅ IMPORTANT: Store token, userId, and username in localStorage
             localStorage.setItem("token", data.token);
             localStorage.setItem("userId", data.user.id);
-            localStorage.setItem("username", data.user.name); // या data.user.username
+            localStorage.setItem("username", data.user.name);
+            localStorage.setItem("email", response?.data?.email);
 
             console.log("Login successful!");
 

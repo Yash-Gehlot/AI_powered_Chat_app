@@ -43,7 +43,10 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({
+      where: { email },
+      attributes: ["id", "username", "email", "password"],
+    });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -72,5 +75,39 @@ export const login = async (req, res) => {
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getUsers = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        message: "Invalid email",
+        success: false,
+      });
+    }
+
+    const verifiedEmail = await User.findOne({
+      where: { email },
+      attributes: ["email"],
+    });
+
+    if (!verifiedEmail) {
+      return res.status(404).json({
+        message: "Not found",
+        success: false,
+      });
+    }
+
+    return res.status(200).json({
+      verifiedEmail,
+      success: true,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.message,
+    });
   }
 };

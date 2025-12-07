@@ -39,13 +39,14 @@
 
     <script>
       const messageLink = "http://localhost:4000/chat";
+      const emailVerificationLink = `http://localhost:4000/user`;
       const messageInput = document.getElementById("messageInput");
       const chatMessages = document.getElementById("chatMessages");
       const chatForm = document.getElementById("chatForm");
 
       const token = localStorage.getItem("token");
       if (!token) {
-        window.location.href = "../signUp/signup.html";
+        window.location.href = "signup.html";
       }
 
       // Socket connection (same as reference)
@@ -130,16 +131,32 @@
       }
 
       // ✅ Join room (same as reference)
-      function handleSearch(event) {
+      async function handleSearch(event) {
         event.preventDefault();
+        const myEmail = localStorage.getItem("email");
+        const meetingEmail = event.target.search.value.trim();
 
-        const email = event.target.search.value.trim();
-        if (!email) return;
+        const roomName = [myEmail, meetingEmail].sort().join("-");
 
-        window.roomName = email;
-        socket.emit("join-room", { roomName: email });
+        try {
+          const response = await axios.post(
+            `${emailVerificationLink}/all`,
+            { email: meetingEmail },
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            }
+          );
+          window.roomName = roomName;
+          socket.emit("join-room", { roomName });
+          alert("Room we join: " + roomName);
+          console.log(response?.data?.verifiedEmail?.email);
+        } catch (error) {
+          alert("Error facing joinig Room: " + error.message);
+          console.log(error.message);
+        }
 
-        alert("Joined room: " + email);
         event.target.reset();
       }
     </script>
