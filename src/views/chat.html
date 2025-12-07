@@ -20,10 +20,20 @@
           <button id="create-room" type="submit">Create Room</button>
         </form>
       </div>
+      <div class="users-box" id="users-box">
+        <span class="chat-switcher" id="chat-switcher">Groups</span>
+      </div>
     </div>
 
     <div class="chat-container">
-      <div class="chat-header"><h2>Chat Room</h2></div>
+      <div class="chat-header">
+        <h2>Chat Room</h2>
+        <div>
+          <span class="username-indicator"
+            >Sign as <span id="username-indicator"></span
+          ></span>
+        </div>
+      </div>
       <div class="chat-messages" id="chatMessages"></div>
 
       <form class="chat-input" id="chatForm">
@@ -40,13 +50,16 @@
     <script>
       const messageLink = "http://localhost:4000/chat";
       const emailVerificationLink = `http://localhost:4000/user`;
+      const allUsers = `http://localhost:4000/user`;
+
       const messageInput = document.getElementById("messageInput");
       const chatMessages = document.getElementById("chatMessages");
       const chatForm = document.getElementById("chatForm");
+      const userBox = document.getElementById("users-box");
 
       const token = localStorage.getItem("token");
       if (!token) {
-        window.location.href = "signup.html";
+        window.location.href = "login.html";
       }
 
       // Socket connection (same as reference)
@@ -62,6 +75,8 @@
       socket.on("new-message", (data) => {
         addMessage(data.message, "received");
       });
+
+      socket.emit("group-chat");
 
       // ✅ Send message
       chatForm.addEventListener("submit", handleSubmit);
@@ -89,6 +104,8 @@
             message,
             roomName: window.roomName,
           });
+
+          socket.emit("group-messages", { message });
 
           // 3️⃣ Show in UI
           addMessage(message, "sent");
@@ -153,12 +170,43 @@
           alert("Room we join: " + roomName);
           console.log(response?.data?.verifiedEmail?.email);
         } catch (error) {
-          alert("Error facing joinig Room: " + error.message);
-          console.log(error.message);
+          alert("Error facing joinig Room: " + error.response.data.message);
+          console.log(error.response.data.message);
         }
 
         event.target.reset();
       }
+      window.addEventListener("DOMContentLoaded", async () => {
+        try {
+          const response = await axios.get(`${allUsers}/users`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+          let typing = Math.random() > 0.5 ? "Typing" : "offline";
+          console.log(typing);
+
+          const users = response.data.users;
+          users.forEach((user) => {
+            let pTag = document.createElement("p");
+            pTag.classList.add("users-cards");
+            pTag.textContent = `${user.username}`;
+            userBox.appendChild(pTag);
+          });
+        } catch (error) {
+          console.log(error.response.message);
+        }
+      });
+
+      // ******************* Chat Switcher ***************** //
+      const chatSwitcher = document.getElementById("chat-switcher");
+      chatSwitcher.addEventListener("click", () => {
+        window.location.href = "./group-chat.html";
+      });
+
+      // current User
+      const usernameIndicator = document.getElementById("username-indicator");
+      usernameIndicator.textContent = `${localStorage.getItem("username")}`;
     </script>
   </body>
 </html>

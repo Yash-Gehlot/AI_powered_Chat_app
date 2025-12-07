@@ -84,14 +84,14 @@ export const getUsers = async (req, res) => {
 
     if (!email) {
       return res.status(400).json({
-        message: "Invalid email",
+        message: "User not found",
         success: false,
       });
     }
 
     const verifiedEmail = await User.findOne({
       where: { email },
-      attributes: ["email"],
+      attributes: ["email", "username"],
     });
 
     if (!verifiedEmail) {
@@ -103,6 +103,30 @@ export const getUsers = async (req, res) => {
 
     return res.status(200).json({
       verifiedEmail,
+      success: true,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.message,
+    });
+  }
+};
+
+export const allUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: ["email", "username"],
+    });
+
+    if (!users || users.length === 0) {
+      return res.status(404).json({
+        message: "Users not found",
+        success: false,
+      });
+    }
+
+    return res.status(200).json({
+      users,
       success: true,
     });
   } catch (err) {

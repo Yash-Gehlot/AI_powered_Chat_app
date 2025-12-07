@@ -70,7 +70,7 @@
             localStorage.setItem("token", data.token);
             localStorage.setItem("userId", data.user.id);
             localStorage.setItem("username", data.user.name);
-            localStorage.setItem("email", response?.data?.email);
+            localStorage.setItem("email", data.user.email);
 
             console.log("Login successful!");
 
