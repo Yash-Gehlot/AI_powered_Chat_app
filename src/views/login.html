@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Login Chat app</title>
-    <!-- <link rel="stylesheet" href="./loginSignup.css" /> -->
+    <link rel="stylesheet" href="Signup-login.css" />
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   </head>
-  <body style="background-color: black; color: wheat">
+  <body>
     <div class="auth-container">
       <h2>Welcome Back</h2>
 
@@ -45,8 +45,6 @@
     </div>
 
     <script>
-      // login.html की script में (या जहाँ तुम login handle कर रहे हो)
-
       document
         .getElementById("loginForm")
         .addEventListener("submit", async (e) => {
@@ -64,15 +62,13 @@
               }
             );
 
-            const data = response.data;
-
-            // ✅ IMPORTANT: Store token, userId, and username in localStorage
-            localStorage.setItem("token", data.token);
-            localStorage.setItem("userId", data.user.id);
-            localStorage.setItem("username", data.user.name);
-            localStorage.setItem("email", data.user.email);
-
+            const { token, user } = response.data;
+            localStorage.setItem("token", token);
+            localStorage.setItem("userId", user.id);
+            localStorage.setItem("username", user.username);
+            localStorage.setItem("email", user.email);
             console.log("Login successful!");
+            console.log(`******* ${user.username} *******`);
 
             // Redirect to chat page
             window.location.href = "/chat.html";

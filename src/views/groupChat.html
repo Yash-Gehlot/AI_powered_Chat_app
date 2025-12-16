@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Group Chat Window</title>
+    <title>Group Chat</title>
     <link rel="stylesheet" href="chat.css" />
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="http://localhost:4000/socket.io/socket.io.js"></script>
@@ -19,78 +19,106 @@
             id="search-input"
             placeholder="Enter group name..."
           />
-          <button id="create-room" type="submit">Create Group</button>
+          <button id="create-room" type="submit">Join Group</button>
         </form>
       </div>
       <div class="users-box" id="users-box">
-        <span class="chat-switcher" id="chat-switcher">Chats</span>
+        <span class="chat-switcher" id="chat-switcher">Switch to Chats</span>
+        <div id="online-users" style="margin-top: 10px"></div>
       </div>
     </div>
 
     <div class="chat-container">
       <div class="chat-header">
-        <h2>Group Chat Room</h2>
+        <h2 id="group-title">Group Chat</h2>
         <div>
-          <span class="username-indicator"
-            >Sign as <span id="username-indicator"></span
-          ></span>
+          <span class="username-indicator">
+            Signed as <span id="username-indicator"></span>
+          </span>
         </div>
       </div>
 
       <div class="chat-messages" id="chatMessages"></div>
 
+      <div class="ai-replies" id="aiReplies" style="display: none">
+        <strong>Quick Replies:</strong>
+        <div id="aiRepliesButtons"></div>
+      </div>
+
       <form class="chat-input" id="chatForm" onsubmit="handleSubmit(event)">
         <input
           type="text"
           id="messageInput"
-          placeholder="Type a message..."
-          required
+          placeholder="Join a group first..."
+          disabled
         />
-        <button type="submit">Send</button>
+        <button type="submit" id="sendBtn" disabled>Send</button>
       </form>
     </div>
 
     <script>
-      const messageLink = `http://localhost:4000/message`;
+      const API_BASE = "http://localhost:4000";
+      const messageLink = `${API_BASE}/chat`;
 
       const messageInput = document.getElementById("messageInput");
       const chatMessages = document.getElementById("chatMessages");
+      const aiRepliesDiv = document.getElementById("aiReplies");
+      const aiRepliesButtons = document.getElementById("aiRepliesButtons");
+      const sendBtn = document.getElementById("sendBtn");
+      const groupTitle = document.getElementById("group-title");
 
-      // Find token inside the localstorage
       const token = localStorage.getItem("token");
+      const currentUser = localStorage.getItem("username");
+
       if (!token) {
         window.location.href = "login.html";
       }
 
-      // make variabe for storing groupName for emiting at server
-      let currentGroupName;
+      let currentGroupName = null;
 
-      // Asscessing socket from backend
-      const socket = io("ws://localhost:4000", { auth: { token } });
+      const socket = io(API_BASE, { auth: { token } });
 
-      // it is for the public group chat and listen for group messages
+      socket.on("connect", () => {
+        console.log("✅ Connected:", socket.id);
+      });
+
+      socket.on("connect_error", (err) => {
+        console.error("Connection error:", err.message);
+      });
+
       socket.on("group-messages", (data) => {
-        console.log(data);
-        addMessage(data.message, "Received");
+        console.log("📩 Group message received:", data);
+        addMessage(data.message, "received", data.username);
+        loadAIReplies();
       });
 
-      // if user is leave room
+      socket.on("user-joined", (data) => {
+        console.log(`👋 ${data.username} joined`);
+        addSystemMessage(data.message);
+      });
+
+      socket.on("user-left", (data) => {
+        console.log(`👋 ${data.username} left`);
+        addSystemMessage(data.message);
+      });
+
       socket.on("disconnect", () => {
-        alert("Disconnected from server");
+        addSystemMessage("⚠️ Disconnected from server");
       });
 
-      // // it is for the public group chat
-      // socket.emit("group-chat");
-
-      // Send message to the DB and socket backend.
       async function handleSubmit(event) {
         event.preventDefault();
+
+        if (!currentGroupName) {
+          alert("⚠️ Please join a group first!");
+          return;
+        }
 
         const message = messageInput.value.trim();
         if (!message) return;
 
         try {
-          const response = await axios.post(
+          await axios.post(
             `${messageLink}/send`,
             { message },
             {
@@ -99,84 +127,113 @@
               },
             }
           );
-          // it is for the public group chat
+
           socket.emit("group-messages", {
             message,
             groupName: currentGroupName,
           });
 
-          addMessage(message, "Sent");
-          alert(response.data.message);
+          addMessage(message, "sent");
+          messageInput.value = "";
+
+          setTimeout(loadAIReplies, 500);
         } catch (error) {
-          console.log(error.response);
+          console.error("❌ Send error:", error);
+          alert("Failed to send message");
         }
-        event.target.reset();
       }
 
-      // get Message from database
-      // window.addEventListener("DOMContentLoaded", async () => {
-      async function fetchdata() {
+      async function loadAIReplies() {
         try {
           const response = await axios.get(`${messageLink}/receive`, {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${token}`,
             },
           });
 
-          const messages = response.data.messages || [];
-          const messageType = response.data.message;
-          console.log(messageType);
+          const aiReplies = response.data.aiReplies || [];
 
-          messages.forEach((msg) => {
-            addMessage(msg.message, messageType);
-          });
+          if (aiReplies.length > 0) {
+            aiRepliesButtons.innerHTML = "";
+            aiReplies.forEach((reply) => {
+              const btn = document.createElement("button");
+              btn.textContent = reply;
+              btn.onclick = (e) => {
+                e.preventDefault();
+                messageInput.value = reply;
+                messageInput.focus();
+              };
+              aiRepliesButtons.appendChild(btn);
+            });
+            aiRepliesDiv.style.display = "block";
+          } else {
+            aiRepliesDiv.style.display = "none";
+          }
         } catch (error) {
-          console.log(error.response);
+          console.log("⚠️ AI replies unavailable:", error.response?.status);
+          aiRepliesDiv.style.display = "none";
         }
       }
-      fetchdata();
 
-      // Add message to the UI
-      function addMessage(text, type) {
+      function addMessage(text, type, username = "") {
         const messageDiv = document.createElement("div");
         messageDiv.classList.add("message", type);
 
-        messageDiv.innerHTML = `
-    <p>${text}</p>
-  `;
+        const label =
+          type === "received" && username
+            ? `<strong>${username}:</strong> `
+            : "";
+        messageDiv.innerHTML = `<p>${label}${text}</p>`;
 
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
-      // Enter the group name
+      function addSystemMessage(text) {
+        const div = document.createElement("div");
+        div.style.cssText =
+          "text-align: center; color: #6495ed; font-style: italic; padding: 8px; font-size: 12px; opacity: 0.8;";
+        div.textContent = text;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
       async function handleSearch(event) {
         event.preventDefault();
 
         const groupName = event.target.search.value.trim();
-        if (!groupName) return;
+        if (!groupName) {
+          alert("⚠️ Please enter a group name");
+          return;
+        }
+
         try {
-          // it is for the public group chat
           socket.emit("group-chat", { groupName });
           currentGroupName = groupName;
-          alert("Room we join: " + groupName);
+
+          chatMessages.innerHTML = "";
+          addSystemMessage(`✅ Joined group: ${groupName}`);
+
+          messageInput.disabled = false;
+          messageInput.placeholder = `Message to ${groupName}...`;
+          sendBtn.disabled = false;
+          groupTitle.textContent = `Group: ${groupName}`;
+
+          console.log("✅ Joined group:", groupName);
         } catch (error) {
-          alert("Error facing joinig Room: " + error.response.data.message);
-          console.log(error.response.data.message);
+          console.error("❌ Join group error:", error);
+          alert("Error joining group");
         }
 
         event.target.reset();
       }
 
-      // ******************* Chat Switcher ***************** //
       const chatSwitcher = document.getElementById("chat-switcher");
       chatSwitcher.addEventListener("click", () => {
         window.location.href = "chat.html";
       });
 
-      // current User
-      const usernameIndicator = document.getElementById("username-indicator");
-      usernameIndicator.textContent = `${localStorage.getItem("username")}`;
+      document.getElementById("username-indicator").textContent = currentUser;
     </script>
   </body>
 </html>

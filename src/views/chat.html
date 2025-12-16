@@ -15,23 +15,24 @@
             type="search"
             name="search"
             id="search-input"
-            placeholder="Search users..."
+            placeholder="Search users by email..."
           />
-          <button id="create-room" type="submit">Create Room</button>
+          <button id="create-room" type="submit">Start Chat</button>
         </form>
       </div>
       <div class="users-box" id="users-box">
         <span class="chat-switcher" id="chat-switcher">Groups</span>
+        <div id="users-list" style="margin-top: 10px"></div>
       </div>
     </div>
 
     <div class="chat-container">
       <div class="chat-header">
-        <h2>Chat Room</h2>
+        <h2 id="chat-title">Select a user to chat</h2>
         <div>
-          <span class="username-indicator"
-            >Sign as <span id="username-indicator"></span
-          ></span>
+          <span class="username-indicator">
+            Signed as <span id="username-indicator"></span>
+          </span>
         </div>
       </div>
       <div class="chat-messages" id="chatMessages"></div>
@@ -40,58 +41,131 @@
         <input
           type="text"
           id="messageInput"
-          placeholder="Type a message..."
-          required
+          placeholder="Select a user first..."
+          disabled
         />
-        <button type="submit">Send</button>
+        <button type="submit" id="sendBtn" disabled>Send</button>
       </form>
     </div>
 
     <script>
-      const messageLink = "http://localhost:4000/chat";
-      const emailVerificationLink = `http://localhost:4000/user`;
-      const allUsers = `http://localhost:4000/user`;
+      const API_BASE = "http://localhost:4000";
+      const messageLink = `${API_BASE}/chat`;
+      const userLink = `${API_BASE}/user`;
 
       const messageInput = document.getElementById("messageInput");
       const chatMessages = document.getElementById("chatMessages");
       const chatForm = document.getElementById("chatForm");
-      const userBox = document.getElementById("users-box");
+      const usersList = document.getElementById("users-list");
+      const sendBtn = document.getElementById("sendBtn");
+      const chatTitle = document.getElementById("chat-title");
 
       const token = localStorage.getItem("token");
-      if (!token) {
+      const currentUserEmail = localStorage.getItem("email");
+      const currentUsername = localStorage.getItem("username");
+
+      if (!token || !currentUserEmail) {
         window.location.href = "login.html";
       }
 
-      // Socket connection (same as reference)
-      const socket = io("ws://localhost:4000", {
+      let currentRoom = null;
+      let currentChatUser = null;
+      let unreadCounts = {};
+
+      const socket = io(API_BASE, {
         auth: { token },
       });
 
       socket.on("connect", () => {
-        console.log("Connected:", socket.id);
+        console.log("✅ Connected:", socket.id);
+        loadUnreadCounts();
       });
 
-      // ✅ Receive real-time message
+      socket.on("connect_error", (err) => {
+        console.error("❌ Connection error:", err.message);
+      });
+
+      // Receive new messages
       socket.on("new-message", (data) => {
-        addMessage(data.message, "received");
+        console.log("📩 Received message:", data);
+        addMessage(data.message, "received", data.username);
       });
 
-      socket.emit("group-chat");
+      // Receive notifications for messages when not in chat
+      socket.on("new-notification", (data) => {
+        console.log("🔔 New notification:", data);
 
-      // ✅ Send message
+        // Update unread count for this room
+        const room = data.roomName;
+        unreadCounts[room] = (unreadCounts[room] || 0) + 1;
+        updateNotificationBadges();
+
+        // Show browser notification if permitted
+        if (Notification.permission === "granted") {
+          new Notification(`New message from ${data.fromUsername}`, {
+            body: data.message,
+            icon: "/favicon.ico",
+          });
+        }
+      });
+
+      // Load unread counts from server
+      async function loadUnreadCounts() {
+        try {
+          const response = await axios.get(`${messageLink}/unread-counts`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          unreadCounts = response.data.unreadCounts || {};
+          updateNotificationBadges();
+        } catch (error) {
+          console.error("Failed to load unread counts:", error);
+        }
+      }
+
+      // Update notification badges on user cards
+      function updateNotificationBadges() {
+        document.querySelectorAll(".users-cards").forEach((card) => {
+          const email = card.dataset.email;
+          const roomName = [currentUserEmail, email].sort().join("-");
+          const count = unreadCounts[roomName] || 0;
+
+          // Remove existing badge
+          const existingBadge = card.querySelector(".notification-badge");
+          if (existingBadge) {
+            existingBadge.remove();
+          }
+
+          // Add new badge if count > 0
+          if (count > 0) {
+            const badge = document.createElement("span");
+            badge.className = "notification-badge";
+            badge.textContent = count;
+            card.appendChild(badge);
+          }
+        });
+      }
+
+      // Send message
       chatForm.addEventListener("submit", handleSubmit);
 
       async function handleSubmit(event) {
         event.preventDefault();
 
+        if (!currentRoom) {
+          alert("⚠️ Please select a user to chat with!");
+          return;
+        }
+
         const message = messageInput.value.trim();
         if (!message) return;
 
         try {
-          // 1️⃣ Save message in DB
+          // Save message in DB with roomName
           await axios.post(
             `${messageLink}/send`,
-            { message },
+            { message, roomName: currentRoom },
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -99,114 +173,197 @@
             }
           );
 
-          // 2️⃣ Emit via socket (ROOM BASED)
+          // Emit to the specific room
           socket.emit("new-message", {
             message,
-            roomName: window.roomName,
+            roomName: currentRoom,
           });
 
-          socket.emit("group-messages", { message });
-
-          // 3️⃣ Show in UI
+          // Show in UI
           addMessage(message, "sent");
+          messageInput.value = "";
         } catch (error) {
-          console.log(error.response);
+          console.error("❌ Send error:", error);
+          alert("Failed to send message");
+        }
+      }
+
+      // Join room and start chat
+      async function handleSearch(event) {
+        event.preventDefault();
+        const targetEmail = event.target.search.value.trim();
+
+        if (!targetEmail) {
+          alert("⚠️ Please enter an email");
+          return;
+        }
+
+        if (targetEmail === currentUserEmail) {
+          alert("⚠️ You cannot chat with yourself!");
+          return;
+        }
+
+        try {
+          const response = await axios.post(
+            `${userLink}/all`,
+            { email: targetEmail },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          const targetUser = response.data.verifiedEmail;
+
+          // Create consistent room name
+          const roomName = [currentUserEmail, targetEmail].sort().join("-");
+          currentRoom = roomName;
+          currentChatUser = targetUser.username;
+
+          // Join the room via socket
+          socket.emit("join-room", { roomName });
+
+          // Mark messages as read
+          await axios.post(
+            `${messageLink}/mark-read`,
+            { roomName },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          // Clear unread count for this room
+          unreadCounts[roomName] = 0;
+          updateNotificationBadges();
+
+          // Update UI
+          chatMessages.innerHTML = "";
+          addSystemMessage(`✅ Started chat with ${targetUser.username}`);
+
+          chatTitle.textContent = `Chat with ${targetUser.username}`;
+          messageInput.disabled = false;
+          messageInput.placeholder = `Message ${targetUser.username}...`;
+          sendBtn.disabled = false;
+
+          console.log("✅ Joined room:", roomName);
+
+          // Load previous messages for this room
+          await loadRoomMessages(roomName);
+        } catch (error) {
+          console.error("❌ Error:", error);
+          alert(error.response?.data?.message || "User not found");
         }
 
         event.target.reset();
       }
 
-      // ✅ Load old messages on page load
-      window.addEventListener("DOMContentLoaded", async () => {
+      // Load messages for specific room
+      async function loadRoomMessages(roomName) {
         try {
-          const response = await axios.get(`${messageLink}/receive`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+          const response = await axios.get(
+            `${messageLink}/receive?roomName=${roomName}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
 
           const messages = response.data.messages || [];
-          const messageType = response.data.message;
 
           messages.forEach((msg) => {
-            addMessage(msg.message, messageType);
+            const isFromMe = msg.User.email === currentUserEmail;
+            addMessage(
+              msg.message,
+              isFromMe ? "sent" : "received",
+              isFromMe ? "" : msg.User.username
+            );
           });
         } catch (error) {
-          console.log(error.response);
+          console.error("❌ Load messages error:", error);
         }
-      });
+      }
 
-      // ✅ Add message to UI
-      function addMessage(text, type) {
+      // Add message to UI
+      function addMessage(text, type, username = "") {
         const div = document.createElement("div");
         div.classList.add("message", type);
 
-        div.innerHTML = `<p>${text}</p>`;
+        const label =
+          type === "received" && username
+            ? `<strong>${username}:</strong> `
+            : "";
+        div.innerHTML = `<p>${label}${text}</p>`;
 
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
-      // ✅ Join room (same as reference)
-      async function handleSearch(event) {
-        event.preventDefault();
-        const myEmail = localStorage.getItem("email");
-        const meetingEmail = event.target.search.value.trim();
+      function addSystemMessage(text) {
+        const div = document.createElement("div");
+        div.style.cssText =
+          "text-align: center; color: #6495ed; font-style: italic; padding: 8px; font-size: 12px; opacity: 0.8;";
+        div.textContent = text;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
 
-        const roomName = [myEmail, meetingEmail].sort().join("-");
-
-        try {
-          const response = await axios.post(
-            `${emailVerificationLink}/all`,
-            { email: meetingEmail },
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }
-          );
-          window.roomName = roomName;
-          socket.emit("join-room", { roomName });
-          alert("Room we join: " + roomName);
-          console.log(response?.data?.verifiedEmail?.email);
-        } catch (error) {
-          alert("Error facing joinig Room: " + error.response.data.message);
-          console.log(error.response.data.message);
+      // Load all users on page load
+      window.addEventListener("DOMContentLoaded", async () => {
+        // Request notification permission
+        if (Notification.permission === "default") {
+          Notification.requestPermission();
         }
 
-        event.target.reset();
-      }
-      window.addEventListener("DOMContentLoaded", async () => {
         try {
-          const response = await axios.get(`${allUsers}/users`, {
+          const response = await axios.get(`${userLink}/users`, {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${token}`,
             },
           });
-          let typing = Math.random() > 0.5 ? "Typing" : "offline";
-          console.log(typing);
 
           const users = response.data.users;
           users.forEach((user) => {
-            let pTag = document.createElement("p");
-            pTag.classList.add("users-cards");
-            pTag.textContent = `${user.username}`;
-            userBox.appendChild(pTag);
+            if (user.email === currentUserEmail) return;
+
+            const userCard = document.createElement("div");
+            userCard.classList.add("users-cards");
+            userCard.dataset.email = user.email;
+            userCard.style.cursor = "pointer";
+            userCard.innerHTML = `
+              <p><strong>${user.username}</strong></p>
+              <p style="font-size: 12px; color: #666;">${user.email}</p>
+            `;
+
+            userCard.onclick = () => {
+              document.getElementById("search-input").value = user.email;
+              document
+                .getElementById("search-form")
+                .dispatchEvent(new Event("submit"));
+            };
+
+            usersList.appendChild(userCard);
           });
+
+          // Load unread counts after rendering users
+          loadUnreadCounts();
         } catch (error) {
-          console.log(error.response.message);
+          console.error("❌ Load users error:", error);
         }
       });
 
-      // ******************* Chat Switcher ***************** //
+      // Chat switcher
       const chatSwitcher = document.getElementById("chat-switcher");
       chatSwitcher.addEventListener("click", () => {
-        window.location.href = "./group-chat.html";
+        window.location.href = "groupChat.html";
       });
 
-      // current User
-      const usernameIndicator = document.getElementById("username-indicator");
-      usernameIndicator.textContent = `${localStorage.getItem("username")}`;
+      // Set current user
+      document.getElementById("username-indicator").textContent =
+        currentUsername;
     </script>
   </body>
 </html>
