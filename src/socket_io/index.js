@@ -7,16 +7,15 @@ import groupChat from "./handlers/groupChat.js";
 const socketServer = (server) => {
   const io = new Server(server);
 
-  // auth middleware
   socketAuth(io);
 
-  // Socket.io handshake
   io.on("connection", (socket) => {
-    console.log(`${socket.id} : User Connected 💖`);
-    // Personal chats groups
-    personalChat(io);
-    groupChat(socket, io);
+    console.log(`${socket.id} : User Connected `);
+    chatHandler(socket, io);
+    personalChat(socket, io);
+    groupChat(socket, io); 
   });
+
   return io;
 };
 

@@ -1,4 +1,4 @@
-module.exports = (socket, io) => {
+export default (socket, io) => {
   socket.on("group-chat", ({ groupName } = {}) => {
     if (!groupName) {
       console.log(`${socket.user.username} connected but no group joined yet`);
@@ -20,7 +20,6 @@ module.exports = (socket, io) => {
     });
   });
 
-  // Simple disconnect handler
   socket.on("disconnect", () => {
     console.log(`${socket.user.username} disconnected`);
   });

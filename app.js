@@ -9,7 +9,7 @@ import "./src/models/index.js";
 import sequelize from "./src/config/db-connection.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import chatRoutes from "./src/routes/messageRoutes.js";
-import messageArchive from "./src/services/messageArchiveService.js";
+import "./src/services/messageArchiveService.js";
 
 dotenv.config({ quiet: true });
 const PORT = process.env.PORT || 4000;

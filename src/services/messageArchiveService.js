@@ -1,9 +1,9 @@
 import cron from "node-cron";
 import { Op } from "sequelize";
-import Message from "../model/message.js";
+import Message from "../models/message.js";
 import ArchivedMessage from "../models/messageArchived.js";
 
-export const archiveOldMessages = async () => {
+const archiveOldMessages = async () => {
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   // Step 1: Get messages older than 1 day
@@ -30,3 +30,4 @@ export const archiveOldMessages = async () => {
 
 // Run every night at 2 AM
 cron.schedule("0 2 * * *", archiveOldMessages);
+export default archiveOldMessages;
